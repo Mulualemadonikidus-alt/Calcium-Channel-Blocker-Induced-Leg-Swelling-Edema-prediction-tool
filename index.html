@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCB-Induced Edema Risk Predictor</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans min-h-screen flex flex-col justify-between">
+
+    <div class="container mx-auto max-w-2xl px-4 py-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-900 tracking-tight">CCB-Induced Edema Predictor</h1>
+            <p class="text-sm text-gray-600 mt-2">Clinical risk estimation tool based on Tolla et al. (2026) and Makani et al. (2011)</p>
+        </header>
+
+        <main class="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 sm:p-8">
+            <form id="predictorForm" class="space-y-6" onsubmit="calculateRisk(event)">
+                
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Calcium Channel Blocker (CCB) Dose</label>
+                    <div class="grid grid-cols-2 gap-4">
+                        <label class="flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-gray-50 transition">
+                            <span class="text-sm font-medium text-gray-900">Standard/Low Dose<br><span class="text-xs text-gray-500">(e.g., Amlodipine 5mg)</span></span>
+                            <input type="radio" name="ccb_dose" value="low" checked class="w-4 h-4 text-blue-600">
+                        </label>
+                        <label class="flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-gray-50 transition">
+                            <span class="text-sm font-medium text-gray-900">High Dose<br><span class="text-xs text-gray-500">(e.g., Amlodipine 10mg)</span></span>
+                            <input type="radio" name="ccb_dose" value="high" class="w-4 h-4 text-blue-600">
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="standing_hours" class="block text-sm font-semibold text-gray-700 mb-1">Daily Standing Duration (Hours)</label>
+                    <p class="text-xs text-gray-500 mb-2">Continuous or prolonged occupational standing</p>
+                    <div class="relative rounded-xl shadow-sm">
+                        <input type="number" id="standing_hours" min="0" max="24" step="0.5" value="2.0" required
+                            class="block w-full rounded-xl border-gray-300 bg-gray-50 px-4 py-3 text-gray-900 focus:border-blue-500 focus:bg-white focus:ring-blue-500 sm:text-sm border">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Concomitant Antihypertensive Therapy</label>
+                    <select id="ras_blocker" class="block w-full rounded-xl border-gray-300 bg-gray-50 px-4 py-3 text-gray-900 focus:border-blue-500 focus:bg-white focus:ring-blue-500 sm:text-sm border">
+                        <option value="none">CCB Monotherapy (No RAS Blocker)</option>
+                        <option value="acei">CCB + ACE Inhibitor (ACEI)</option>
+                        <option value="arb">CCB + Angiotensin Receptor Blocker (ARB)</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="w-full gradient-bg text-white font-semibold py-3.5 px-4 rounded-xl shadow-md hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition cursor-pointer">
+                    Calculate Probability
+                </button>
+            </form>
+
+            <div id="resultsPanel" class="hidden mt-8 pt-6 border-t border-gray-100">
+                <div class="text-center">
+                    <h3 class="text-lg font-medium text-gray-900">Estimated Risk Profile</h3>
+                    <div class="mt-4 inline-flex items-baseline justify-center">
+                        <span id="riskPercentage" class="text-5xl font-extrabold tracking-tight text-blue-600">0.0%</span>
+                        <span class="text-lg font-semibold text-gray-500 ml-1">probability</span>
+                    </div>
+                    
+                    <div class="w-full bg-gray-200 rounded-full h-3 mt-4 overflow-hidden">
+                        <div id="riskBar" class="h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+
+                    <div class="mt-4">
+                        <span id="riskBadge" class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"></span>
+                    </div>
+
+                    <div class="mt-6 p-4 bg-gray-50 rounded-xl text-left border border-gray-100">
+                        <h4 class="text-sm font-bold text-gray-900 mb-1">Evidence-Based Insights:</h4>
+                        <p id="clinicalNote" class="text-sm text-gray-600 leading-relaxed"></p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <footer class="text-center py-4 bg-gray-100 text-xs text-gray-500 border-t border-gray-200">
+        For academic and educational use only. Treatment strategies should balance efficacy and safety profiles.
+    </footer>
+
+    <script>
+        function calculateRisk(event) {
+            event.preventDefault();
+
+            // 1. Model Intercept Setup
+            // Based on baseline cohort tracking data 
+            const baseline_prob = 0.22; 
+            const intercept = Math.log(baseline_prob / (1 - baseline_prob));
+
+            // 2. Beta Coefficients derived from Multivariable Model AORs
+            const beta_high_dose = Math.log(1.58);   // High-dose CCB AOR = 1.58
+            const beta_standing = Math.log(1.92) / 8; // Normalized per hour continuous scale
+            
+            // Protective factors derived from RAS meta-analysis data
+            const beta_acei = Math.log(0.32); 
+            const beta_arb = Math.log(0.68);  
+
+            // 3. Retrieve Inputs (Fixed Selector Typo Here)
+            const isHighDose = document.querySelector('input[name="ccb_dose"]:checked').value === 'high';
+            const standingHours = parseFloat(document.getElementById('standing_hours').value) || 0;
+            const rasBlocker = document.getElementById('ras_blocker').value;
+
+            // 4. Compute Log-Odds (Logit Link)
+            let logit = intercept;
+
+            if (isHighDose) logit += beta_high_dose;
+            logit += (standingHours * beta_standing);
+
+            if (rasBlocker === 'acei') {
+                logit += beta_acei;
+            } else if (rasBlocker === 'arb') {
+                logit += beta_arb;
+            }
+
+            // 5. Compute Logistic Sigmoid Transformation
+            const probability = 1 / (1 + Math.exp(-logit));
+            const pct = (probability * 100).toFixed(1);
+
+            // 6. UI Rendering & Stratification
+            document.getElementById('riskPercentage').innerText = pct + '%';
+            
+            const rBar = document.getElementById('riskBar');
+            const rBadge = document.getElementById('riskBadge');
+            const cNote = document.getElementById('clinicalNote');
+            const rPanel = document.getElementById('resultsPanel');
+
+            // Unhide panel instantly
+            rPanel.classList.remove('hidden');
+            rBar.style.width = pct + '%';
+
+            // Risk Categorization & Adaptive Styling
+            if (probability < 0.25) {
+                rBar.className = "h-3 rounded-full bg-green-500 transition-all duration-500";
+                rBadge.className = "inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800";
+                rBadge.innerText = "Low Risk Profile";
+                cNote.innerHTML = "Patient demonstrates highly favorable risk metrics. Standard blood pressure tracking and routine follow-ups are clinically appropriate.";
+            } else if (probability >= 0.25 && probability < 0.45) {
+                rBar.className = "h-3 rounded-full bg-yellow-500 transition-all duration-500";
+                rBadge.className = "inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800";
+                rBadge.innerText = "Moderate Risk Profile";
+                cNote.innerHTML = "Moderate chance of fluid accumulation. Consider non-pharmacological adjustments (e.g., scheduled movement breaks for occupational standing) or pairing with a <strong>RAS Blocker</strong> if additional blood pressure optimization is required.";
+            } else {
+                rBar.className = "h-3 rounded-full bg-red-600 transition-all duration-500";
+                rBadge.className = "inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800";
+                rBadge.innerText = "High Risk Profile";
+                cNote.innerHTML = "<strong>Clinical Adjustment Suggested:</strong> High probability of peripheral edema. Initiating treatment as combination therapy featuring an <strong>ACE Inhibitor</strong> or optimizing to lower-dose CCB schemas could improve therapeutic adherence and minimize capillary transudation.";
+            }
+        }
+    </script>
+</body>
+</html>
